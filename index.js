@@ -24,7 +24,7 @@ app.post('/check-slots', async (req, res) => {
     await page.goto('https://cemolimpia.matchpoint.com.es/Login.aspx', { waitUntil: 'networkidle2', timeout: 30000 });
     await page.type('#ContentPlaceHolderContenido_Login1_UserName', USERNAME);
     await page.type('#ContentPlaceHolderContenido_Login1_Password', PASSWORD);
-    await new Promise(r => setTimeout(r, 4000));
+    await new Promise(r => setTimeout(r, 8000));
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 25000 }),
       page.click('#ContentPlaceHolderContenido_Login1_LoginButton')
