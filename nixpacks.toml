@@ -1,5 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "chromium"]
+
 [phases.install]
-cmds = ["npm install --ignore-scripts", "node node_modules/puppeteer/install.mjs || true"]
+cmds = ["npm install"]
 
 [start]
 cmd = "node index.js"
