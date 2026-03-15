@@ -1,31 +1,69 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
+
 const app = express();
 app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || 'tenis123';
 const USERNAME = process.env.CEMOLIMPIA_USER;
 const PASSWORD = process.env.CEMOLIMPIA_PASS;
+
 app.post('/check-slots', async (req, res) => {
-  if (req.headers['x-api-key'] !== API_KEY) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.headers['x-api-key'] !== API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   let browser;
   try {
-    browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] });
+    browser = await puppeteer.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process'
+      ]
+    });
+
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
-    await page.goto('https://cemolimpia.matchpoint.com.es/Login.aspx', { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    console.log('Login sayfasina gidiliyor...');
+    await page.goto('https://cemolimpia.matchpoint.com.es/Login.aspx', {
+      waitUntil: 'networkidle2',
+      timeout: 30000
+    });
+
     await page.type('#ContentPlaceHolderContenido_Login1_UserName', USERNAME);
     await page.type('#ContentPlaceHolderContenido_Login1_Password', PASSWORD);
     await new Promise(r => setTimeout(r, 4000));
-    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 25000 }), page.click('#ContentPlaceHolderContenido_Login1_LoginButton')]);
+
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 25000 }),
+      page.click('#ContentPlaceHolderContenido_Login1_LoginButton')
+    ]);
+
     const loginUrl = page.url();
-    if (!loginUrl.includes('Intranet') && !loginUrl.includes('intranet')) {
+    const isLoggedIn = loginUrl.includes('Intranet') || loginUrl.includes('intranet');
+    console.log('Login URL:', loginUrl, '| Logged in:', isLoggedIn);
+
+    if (!isLoggedIn) {
       await browser.close();
       return res.json({ success: false, error: 'Login basarisiz', loginUrl });
     }
-    await page.goto('https://cemolimpia.matchpoint.com.es/Booking/Grid.aspx', { waitUntil: 'networkidle2', timeout: 30000 });
+
+    console.log('Booking sayfasina gidiliyor...');
+    await page.goto('https://cemolimpia.matchpoint.com.es/Booking/Grid.aspx', {
+      waitUntil: 'networkidle2',
+      timeout: 30000
+    });
+
     await page.select('select#calendarios', '5');
     await new Promise(r => setTimeout(r, 3000));
+
     const bosSlotlar = await page.$$eval('[onclick]', (elements) => {
       const slots = {};
       elements.forEach(el => {
@@ -40,12 +78,28 @@ app.post('/check-slots', async (req, res) => {
       });
       return slots;
     });
+
     await browser.close();
-    res.json({ success: true, bosSlotlar, saatSayisi: Object.keys(bosSlotlar).length, kontrol: new Date().toISOString() });
+    console.log('Bos slot sayisi:', Object.keys(bosSlotlar).length);
+
+    res.json({
+      success: true,
+      bosSlotlar,
+      saatSayisi: Object.keys(bosSlotlar).length,
+      kontrol: new Date().toISOString()
+    });
+
   } catch (err) {
+    console.error('Hata:', err.message);
     if (browser) await browser.close();
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.listen(PORT, () => console.log('Tenis bot ' + PORT + ' portunda calisiyor'));
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log('Tenis bot ' + PORT + ' portunda calisiyor');
+});
